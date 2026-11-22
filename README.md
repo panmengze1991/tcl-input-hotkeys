@@ -29,3 +29,7 @@ $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 默认自动连接发现的唯一一台 TCL 电视。如果有多台电视，先运行 `TclInputHotkeys.exe --discover` 查看地址，再用 `TclInputHotkeys.exe --ip TV_IP` 指定要控制的电视。保持电视开机，并将电视和电脑连接到同一个局域网。
 
 协议参考 [T-Cast 局域网协议](https://github.com/DusKing1/ha-tcl-tv/blob/main/docs/protocol.md)。Windows 输入接口参考 [RegisterHotKey](https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-registerhotkey) 和 [LowLevelMouseProc](https://learn.microsoft.com/windows/win32/winmsg/lowlevelmouseproc)。
+
+## 许可证
+
+本项目采用 [MIT 许可证](LICENSE)。
