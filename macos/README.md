@@ -37,6 +37,10 @@
 
 此时菜单栏会显示锁图标，其他普通键盘按键会被拦截，鼠标左键仍可正常操作 Mac。关闭开关或按 `Command + Control + L` 即可切回 Mac。
 
+### 长按关机
+
+面板底部提供「长按关机」按钮，按住约 1 秒待红色进度条走满后发送 T-Cast 电源键（`149>>20`）触发电视关机；中途松手或拖离按钮会自动取消，避免误触。
+
 ### 设备切换
 
 可从面板里的设备菜单切换电视、重新搜索或手动输入电视的 IPv4 地址。右上角的更多菜单可退出应用。
@@ -46,11 +50,12 @@
 ```sh
 ./tcl discover
 ./tcl source
+./tcl power --ip 192.168.1.10
 ./tcl volume-up --ip 192.168.1.10
 ./tcl hotkeys [--ip 192.168.1.10]
 ```
 
-支持的遥控命令：`source`、`home`、`up`、`down`、`left`、`right`、`ok`、`back`、`volume-up`、`volume-down`、`mute`。
+支持的遥控命令：`source`、`home`、`power`、`up`、`down`、`left`、`right`、`ok`、`back`、`volume-up`、`volume-down`、`mute`。
 
 ## 代码结构
 

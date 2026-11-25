@@ -129,6 +129,158 @@ private struct RemoteButtonStyle: ButtonStyle {
     }
 }
 
+private final class PowerHoldController: ObservableObject {
+    @Published var isHolding = false
+    @Published var hasTriggered = false
+    @Published var progress: CGFloat = 0
+
+    let duration: TimeInterval = 1.0
+    private var holdStart: Date?
+    private var holdTimer: Timer?
+    private var resetWorkItem: DispatchWorkItem?
+
+    func startHold(action: @escaping () -> Void) {
+        guard !isHolding, !hasTriggered else { return }
+        resetWorkItem?.cancel()
+        holdTimer?.invalidate()
+        isHolding = true
+        hasTriggered = false
+        progress = 0
+        holdStart = Date()
+        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+            guard let self, let start = self.holdStart else { return }
+            let fraction = min(1.0, Date().timeIntervalSince(start) / self.duration)
+            self.progress = CGFloat(fraction)
+            if fraction >= 1.0 {
+                self.completeHold(action: action)
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        holdTimer = timer
+    }
+
+    private func completeHold(action: @escaping () -> Void) {
+        holdTimer?.invalidate()
+        holdTimer = nil
+        holdStart = nil
+        hasTriggered = true
+        progress = 1.0
+        NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
+        action()
+        let item = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            withAnimation(.easeOut(duration: 0.22)) {
+                self.progress = 0
+            }
+            self.isHolding = false
+            self.hasTriggered = false
+        }
+        resetWorkItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.55, execute: item)
+    }
+
+    func endHold() {
+        if !hasTriggered {
+            cancelHold()
+        } else {
+            isHolding = false
+        }
+    }
+
+    func cancelHold() {
+        holdTimer?.invalidate()
+        holdTimer = nil
+        holdStart = nil
+        guard isHolding || progress > 0 else { return }
+        isHolding = false
+        withAnimation(.easeOut(duration: 0.16)) {
+            progress = 0
+        }
+    }
+
+    func resetImmediately() {
+        resetWorkItem?.cancel()
+        resetWorkItem = nil
+        holdTimer?.invalidate()
+        holdTimer = nil
+        holdStart = nil
+        isHolding = false
+        hasTriggered = false
+        progress = 0
+    }
+}
+
+private let powerHoldController = PowerHoldController()
+
+private struct PowerHoldButton: View {
+    let width: CGFloat
+    @ObservedObject var controller: PowerHoldController
+    let action: () -> Void
+
+    @Environment(\.isEnabled) private var isEnabled
+
+    private let accent = Color(red: 0.86, green: 0.22, blue: 0.22)
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(accent.opacity(controller.isHolding ? 0.16 : 0.10))
+
+            GeometryReader { geo in
+                Rectangle()
+                    .fill(accent.opacity(0.92))
+                    .frame(width: max(0, geo.size.width * controller.progress), height: geo.size.height)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            labelContent(foreground: accent)
+
+            GeometryReader { geo in
+                labelContent(foreground: Color.white)
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .mask(alignment: .leading) {
+                        Rectangle()
+                            .frame(width: max(0, geo.size.width * controller.progress))
+                    }
+            }
+        }
+        .frame(width: width, height: 40)
+        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .opacity(isEnabled ? 1 : 0.45)
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { value in
+                    guard isEnabled else { return }
+                    let inside = value.location.x >= -16 && value.location.x <= width + 16 &&
+                                 value.location.y >= -16 && value.location.y <= 56
+                    if !inside {
+                        controller.cancelHold()
+                        return
+                    }
+                    controller.startHold(action: action)
+                }
+                .onEnded { _ in
+                    controller.endHold()
+                }
+        )
+        .onDisappear { controller.resetImmediately() }
+        .help("长按 1 秒触发电视关机")
+        .accessibilityLabel("长按关机")
+    }
+
+    @ViewBuilder
+    private func labelContent(foreground: Color) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: controller.hasTriggered ? "checkmark" : "power")
+                .font(.system(size: 13, weight: .semibold))
+            Text(controller.hasTriggered ? "已发送关机" : (controller.isHolding ? "继续按住关机…" : "长按关机"))
+                .font(.system(size: 12, weight: .semibold))
+        }
+        .foregroundStyle(foreground)
+    }
+}
+
 private struct RemotePanel: View {
     @ObservedObject var capture: KeyboardLock
     @ObservedObject var remote: RemoteService
@@ -201,6 +353,9 @@ private struct RemotePanel: View {
                 RemoteButton(symbol: "speaker.plus", label: "音量加", command: .volumeUp, width: 64)
             }
             .disabled(remote.selected == nil)
+
+            PowerHoldButton(width: 208, controller: powerHoldController) { remote.powerOff() }
+                .disabled(remote.selected == nil)
         }
         .padding(16)
         .fixedSize()
@@ -223,6 +378,12 @@ private struct RemotePanel: View {
             .menuStyle(.borderlessButton)
             if let error = remote.errorMessage {
                 Text(error)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .frame(width: 208, alignment: .leading)
+            } else if let status = remote.statusMessage {
+                Text(status)
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                     .lineLimit(2)

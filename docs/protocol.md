@@ -52,6 +52,7 @@ Windows 与 macOS 两个平台的上层实现共同遵循同一套 TCL T-Cast「
 | 确定 | `15` | `ok` |
 | 返回 | `16` | `back` |
 | 电视主页 | `19` | `home` |
+| 电源 | `20` | `power` |
 | 音量加 | `21` | `volume-up` |
 | 音量减 | `22` | `volume-down` |
 | 静音 | `23` | `mute` |

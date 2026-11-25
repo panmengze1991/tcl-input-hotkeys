@@ -3,12 +3,12 @@ import Combine
 
 enum RemoteKey: UInt8 {
     case up = 11, down, left, right, ok, back
-    case home = 19
+    case home = 19, power = 20
     case volumeUp = 21, volumeDown, mute
     case source = 29
 
     static let commands: [String: RemoteKey] = [
-        "source": .source, "home": .home, "up": .up, "down": .down, "left": .left, "right": .right,
+        "source": .source, "home": .home, "power": .power, "up": .up, "down": .down, "left": .left, "right": .right,
         "ok": .ok, "back": .back, "volume-up": .volumeUp, "volume-down": .volumeDown, "mute": .mute,
     ]
 }
@@ -18,6 +18,7 @@ final class RemoteService: ObservableObject {
     @Published private(set) var selected: TVDevice?
     @Published private(set) var isSearching = false
     @Published private(set) var errorMessage: String?
+    @Published private(set) var statusMessage: String?
 
     private let client = TCastClient()
     private lazy var connection = TCastConnection(client: client)
@@ -27,6 +28,7 @@ final class RemoteService: ObservableObject {
     private var selectedAddress: String?
     private let preferencesKey = "selectedTVAddress"
     private var keepAlive: DispatchSourceTimer?
+    private var statusClearWorkItem: DispatchWorkItem?
 
     func start(preferredAddress: String?) {
         if let address = preferredAddress ?? UserDefaults.standard.string(forKey: preferencesKey),
@@ -97,7 +99,7 @@ final class RemoteService: ObservableObject {
         }
     }
 
-    func send(_ key: RemoteKey) {
+    func send(_ key: RemoteKey, successMessage: String? = nil) {
         guard let address = selected?.address, pending.wait(timeout: .now()) == .success else { return }
         queue.async { [weak self] in
             guard let self else { return }
@@ -107,11 +109,29 @@ final class RemoteService: ObservableObject {
             DispatchQueue.main.async {
                 guard self.selected?.address == address else { return }
                 switch result {
-                case .success: self.errorMessage = nil
-                case let .failure(error): self.errorMessage = error.localizedDescription
+                case .success:
+                    self.errorMessage = nil
+                    if let successMessage { self.showStatus(successMessage) }
+                case let .failure(error):
+                    self.statusMessage = nil
+                    self.errorMessage = error.localizedDescription
                 }
             }
         }
+    }
+
+    func powerOff() {
+        send(.power, successMessage: "已发送关机指令")
+    }
+
+    private func showStatus(_ message: String) {
+        statusClearWorkItem?.cancel()
+        statusMessage = message
+        let item = DispatchWorkItem { [weak self] in
+            if self?.statusMessage == message { self?.statusMessage = nil }
+        }
+        statusClearWorkItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: item)
     }
 }
 

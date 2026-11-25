@@ -55,7 +55,9 @@ struct TCastClient {
                 }
             }
             guard count > 0 else { continue }
-            let fields = String(decoding: buffer.prefix(count), as: UTF8.self).split(separator: ":", omittingEmptySubsequences: false)
+            let payload = String(decoding: buffer.prefix(count), as: UTF8.self)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "\0"))
+            let fields = payload.split(separator: ":", omittingEmptySubsequences: false)
             guard fields.count > 3, fields[3] == "TV", let address = ipv4String(sender.sin_addr) else { continue }
             devices[address] = TVDevice(address: address, name: fields[2].isEmpty ? "TCL 电视" : String(fields[2]))
         }
