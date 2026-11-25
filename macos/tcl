@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+base=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+
+app="$base/TCL 遥控器.app"
+if [ ! -x "$app/Contents/MacOS/TCLRemote" ]; then
+    "$base/build-app" >/dev/null
+fi
+
+if [ "${1:-}" = hotkeys ]; then
+    shift
+    exec /usr/bin/open "$app" --args "$@"
+fi
+
+exec "$app/Contents/MacOS/TCLRemote" --cli "$@"

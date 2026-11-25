@@ -1,4 +1,11 @@
+# Windows
 *.exe
 *.pdb
 bin/
 obj/
+
+# macOS
+.DS_Store
+*.app/
+.tcl-hotkeys
+.tcl-app-build.*/
